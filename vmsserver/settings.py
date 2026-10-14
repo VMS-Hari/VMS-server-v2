@@ -136,8 +136,11 @@ DATABASES = {
         "PASSWORD": os.getenv("DB_PASSWORD"),
         "HOST": os.getenv("DB_HOST"),
         "PORT": os.getenv("DB_PORT", "5432"),
+        # "OPTIONS": {
+        #     "sslmode": "require",
+        # },
         "OPTIONS": {
-            "sslmode": "require",
+            "sslmode": os.getenv("DB_SSLMODE", "prefer"),
         },
     }
 }
@@ -208,14 +211,14 @@ SIMPLE_JWT = {
 }
 
 
-# CORS_ALLOWED_ORIGINS = [
-#     "http://localhost:5173",
-# ]
-
-CORS_ALLOWED_ORIGIN_REGEXES = [
-    r"^http://localhost:\d+$",
-    r"^http://127\.0\.0\.1:\d+$",
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
 ]
+
+# CORS_ALLOWED_ORIGIN_REGEXES = [
+#     r"^http://localhost:\d+$",
+#     r"^http://127\.0\.0\.1:\d+$",
+# ]
 
 
 MEDIA_URL = "/media/"
