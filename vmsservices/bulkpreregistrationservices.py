@@ -90,6 +90,7 @@ def _prepare_batch(user, d):
 
     return {
         "kind": kind,
+        "visitor_type": vtype,
         "model": KIND_MODELS[kind],
         "site": site_obj,
         "tenant": tenant_obj,

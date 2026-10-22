@@ -1,7 +1,8 @@
 from django.core.paginator import Paginator
 from django.db import IntegrityError
+from django.db.models.deletion import ProtectedError
 
-from .models import Category
+from .models import Category, Site
 
 
 def _serialize(obj):
@@ -83,20 +84,68 @@ def update_category(guid, category_name, user):
         "data": _serialize(obj),
     }
 
+# def delete_category(guid):
+
+#     deleted, _ = Category.objects.filter(guid=guid).delete()
+
+#     if not deleted:
+#         return {
+#             "success": False,
+#             "message": "Category not found",
+#             "status_code": 404,
+#         }
+
+#     return {
+#         "success": True,
+#         "message": "Category deleted",
+#     }
+
+
+
 def delete_category(guid):
+    category = Category.objects.filter(guid=guid).first()
 
-    deleted, _ = Category.objects.filter(guid=guid).delete()
-
-    if not deleted:
+    if category is None:
         return {
             "success": False,
             "message": "Category not found",
             "status_code": 404,
         }
 
+    # Find sites using this category.
+    related_sites = Site.objects.filter(category=category)
+
+    if related_sites.exists():
+        site_names = list(
+            related_sites.values_list("site_name", flat=True)
+        )
+
+        return {
+            "success": False,
+            "message": (
+                f"Cannot delete category '{category.category_name}' "
+                f"because it is used by these sites: "
+                f"{', '.join(site_names)}. "
+                "Please reassign or delete those sites first."
+            ),
+            "status_code": 409,
+        }
+
+    try:
+        category.delete()
+    except ProtectedError:
+        return {
+            "success": False,
+            "message": (
+                "Cannot delete this category because "
+                "other records are still using it."
+            ),
+            "status_code": 409,
+        }
+
     return {
         "success": True,
-        "message": "Category deleted",
+        "message": "Category deleted successfully",
     }
 
 

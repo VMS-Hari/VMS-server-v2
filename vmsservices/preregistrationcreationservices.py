@@ -387,6 +387,7 @@ def _upsert_person(ctx):
 def _record_fields(ctx, person):
     return {
         "person": person,
+        "visitor_type": ctx["visitor_type"],
         "site": ctx["site"],
         "tenant": ctx["tenant"],
         "company": ctx["company"],

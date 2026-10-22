@@ -112,9 +112,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'vmsserver.wsgi.application'
 
-
-# Database
-# https://docs.djangoproject.com/en/6.1/ref/settings/#databases
+# local DB setup
 
 # DATABASES = {
 #     "default": {
@@ -127,6 +125,9 @@ WSGI_APPLICATION = 'vmsserver.wsgi.application'
 #     }
 # }
 
+
+
+# Server DB setup
 
 DATABASES = {
     "default": {
@@ -221,3 +222,11 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 SUPER_ADMIN_LOGO = "site_images/2026/09/adminlogo.jpg"
+
+
+
+
+
+
+# Daily activity log files: logs/<module>/<module>_YYYY-MM-DD.log
+ACTIVITY_LOG_DIR = BASE_DIR / "logs"

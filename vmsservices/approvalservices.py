@@ -150,7 +150,11 @@ def serialize_request(rec, kind):
         "id": rec.id,
         "kind": kind,
         # CHANGED: the type comes from the table, not from a column
-        "visitor_type": {"guid": None, "name": kind},
+        # "visitor_type": {"guid": None, "name": kind},
+        "visitor_type": {
+            "guid": str(rec.visitor_type.guid),
+            "name": rec.visitor_type.name,
+        } if rec.visitor_type_id else {"guid": None, "name": kind},
         "person": {
             "id": p.id,
             "person_name": p.person_name,
@@ -197,7 +201,7 @@ def find_record(guid, lock=False):
     for kind, model in KIND_MODELS.items():
         # CHANGED: "visitor_type" removed from select_related
         qs = model.objects.select_related(
-            "person", "site", "tenant", "approved_by"
+            "person", "site", "tenant", "approved_by", "visitor_type"
         )
         if lock:
             qs = qs.select_for_update(of=("self",))
@@ -247,7 +251,7 @@ def _build_qs(model, scope_q, search, status, from_date, to_date,
     # visitor_type_guid filter removed (collect_rows picks the table instead)
     qs = (
         model.objects
-        .select_related("person", "site", "tenant", "approved_by")
+        .select_related("person", "site", "tenant", "approved_by", "visitor_type")
         .filter(scope_q, source__in=PRE_REG_SOURCES)
     )
 
@@ -609,7 +613,7 @@ def act_on_bulk(user, bulk_id, action, remark=""):
         for kind, model in KIND_MODELS.items():
             qs = (
                 model.objects
-                .select_related("person", "site", "tenant", "approved_by")
+                .select_related("person", "site", "tenant", "approved_by", "visitor_type")
                 .select_for_update(of=("self",))
                 .filter(bulk_id=bulk_id, source__in=PRE_REG_SOURCES)
             )

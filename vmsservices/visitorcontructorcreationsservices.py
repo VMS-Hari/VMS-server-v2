@@ -55,6 +55,10 @@ def _serialize(rec, kind, pass_names=None, key_names=None):
     return {
         "guid": str(rec.guid),
         "id": rec.id,
+        "visitor_type": {
+            "guid": str(rec.visitor_type.guid),
+            "name": rec.visitor_type.name,
+        } if rec.visitor_type_id else {"guid": None, "name": kind},
         "kind": kind,
         "person": _serialize_person(rec.person),
         "site": {"guid": str(rec.site.guid), "name": rec.site.site_name},
@@ -163,7 +167,7 @@ def _site_scope(user, site_guid):
 def _build_qs(model, scope_q, search, from_date, to_date):
     qs = (
         model.objects
-        .select_related("person", "site", "tenant")
+        .select_related("person", "site", "tenant", "visitor_type")
         .filter(scope_q)
     )
 
@@ -579,7 +583,7 @@ def check_out(user, kind, guid):
     with transaction.atomic():
         rec = (
             model.objects.select_for_update(of=("self",))
-            .select_related("person", "site", "tenant")
+            .select_related("person", "site", "tenant", "visitor_type")
             .filter(guid=guid)
             .first()
         )
@@ -638,7 +642,7 @@ def find_checked_in_by_pass(user, site, pass_no):
     for kind, model in KIND_MODELS.items():
         rec = (
             model.objects
-            .select_related("person", "site", "tenant")
+            .select_related("person", "site", "tenant", "visitor_type")
             .filter(
                 site=site_obj,
                 pass_no=pass_no,

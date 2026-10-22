@@ -254,7 +254,7 @@ def delete_site(guid):
     except ProtectedError:
         return {
             "success": False,
-            "message": "Site has sub-sites or users assigned and cannot be deleted",
+            "message": "Site has sub-sites or Tenant assigned so cannot be deleted",
             "status_code": 409,
         }
 

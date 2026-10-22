@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views,roleviews, rolepermissionviews, usercreationviews, sitetypeviews, sitemodelviews, categoryviews, sitecreationviews, tenantcreationviews, identitytypeviews, keycreationviews, visitortypeviews, passcreationviews,tenantnotificationviews,visitorcontructorcreationsviews,bancreationviews, approvalviews, preregistrationcreationviews, preregistrationapprovedviews, reportviews, bulkpreregistrationviews, dashboardviews
+from . import views,roleviews, rolepermissionviews, usercreationviews, sitetypeviews, sitemodelviews, categoryviews, sitecreationviews, tenantcreationviews, identitytypeviews, keycreationviews, visitortypeviews, passcreationviews,tenantnotificationviews,visitorcontructorcreationsviews,bancreationviews, approvalviews, preregistrationcreationviews, preregistrationapprovedviews, reportviews, bulkpreregistrationviews,  dashboardviews, logviews
 
 urlpatterns = [
     path("accounts/login/", views.login_api, name="login"),
@@ -130,5 +130,6 @@ urlpatterns = [
     path("dashboard/summary/", dashboardviews.dashboard_summary_api, name="dashboard-summary"),
     path("dashboard/not-checked-out/", dashboardviews.dashboard_not_checked_out_api, name="dashboard-not-checked-out"),
 
-
+    # log details api
+    path("logs/list/", logviews.log_list_api, name="log-list"),
 ]

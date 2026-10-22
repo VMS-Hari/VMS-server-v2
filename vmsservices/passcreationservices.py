@@ -3,19 +3,22 @@ from django.db import IntegrityError, transaction
 from django.db.models import ProtectedError, Q
 from django.db.models.functions import Lower
 
-from .models import Pass, Site, VisitorType
+from .models import Contractor, Pass, Site,Visitor, VisitorType
 from .rolepermissionservices import user_can_view_site
 
 # must match the menu_key stored in RolePermission for the Pass page
 PASS_MENU_KEY = "/property-management/pass"
 
 
-def _serialize(obj):
+def _serialize(obj , assigned=None):
     return {
         "guid": str(obj.guid),
         "pass_no": obj.pass_no,
         "pass_name": obj.pass_name,
         "status": obj.status,
+        # "source": assigned["source"] if assigned else None,
+        "source": assigned["source"] if assigned else None,
+        "assigned_to": assigned,
         "site": {
             "guid": str(obj.site.guid),
             "name": obj.site.site_name,
@@ -31,6 +34,47 @@ def _serialize(obj):
         "updated_at": obj.updated_at,
     }
 
+def _assigned_map(pass_objs):
+    """Find who is currently checked in with each Assigned pass.
+    Returns {(site_id, lower pass_no): {...}}"""
+    wanted = [o for o in pass_objs if o.status == "Assigned"]
+    if not wanted:
+        return {}
+
+    site_ids = {o.site_id for o in wanted}
+    pass_nos = {o.pass_no.lower() for o in wanted}
+
+    result = {}
+
+    for kind, model in (("Visitor", Visitor), ("Contractor", Contractor)):
+        rows = (
+            model.objects
+            .filter(
+                site_id__in=site_ids,
+                check_in__isnull=False,
+                check_out__isnull=True,
+            )
+            .annotate(p=Lower("pass_no"))
+            .filter(p__in=pass_nos)
+            .select_related("person")
+            .order_by("check_in")
+        )
+
+        for r in rows:
+            key = (r.site_id, r.p)
+            current = result.get(key)
+
+            if current and current["check_in"] > r.check_in:
+                continue
+
+            result[key] = {
+                "kind": kind,
+                "source": r.source,
+                "person_name": r.person.person_name,
+                "check_in": r.check_in,
+            }
+
+    return result
 
 def _forbidden():
     return {
@@ -335,16 +379,30 @@ def list_passes(page=None, page_size=None, search="", site_guid=None, status="",
     # --------------------------------
     # FULL DATA
     # --------------------------------
+    # if page is None and page_size is None:
+
+    #     return {
+    #         "success": True,
+    #         "message": "Passes fetched",
+    #         "data": {
+    #             "results": [_serialize(obj) for obj in qs]
+    #         },
+    #     }
+
     if page is None and page_size is None:
+        objs = list(qs)
+        assigned = _assigned_map(objs)
 
         return {
             "success": True,
             "message": "Passes fetched",
             "data": {
-                "results": [_serialize(obj) for obj in qs]
+                "results": [
+                    _serialize(o, assigned.get((o.site_id, o.pass_no.lower())))
+                    for o in objs
+                ]
             },
         }
-
     # --------------------------------
     # PAGINATION
     # --------------------------------
@@ -361,12 +419,18 @@ def list_passes(page=None, page_size=None, search="", site_guid=None, status="",
         }
 
     page_obj = paginator.page(page)
+    objs = list(page_obj.object_list)
+    assigned = _assigned_map(objs)
 
     return {
         "success": True,
         "message": "Passes fetched",
         "data": {
-            "results": [_serialize(obj) for obj in page_obj.object_list],
+            # "results": [_serialize(obj) for obj in page_obj.object_list],
+            "results": [
+                _serialize(o, assigned.get((o.site_id, o.pass_no.lower())))
+                for o in objs
+            ],
             "pagination": {
                 "page": page,
                 "page_size": page_size,

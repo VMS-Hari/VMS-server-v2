@@ -1,7 +1,10 @@
 from django.core.paginator import Paginator
 from django.db import IntegrityError
+from django.db.models.deletion import ProtectedError
+from .activitylog import write_log
 
-from .models import SiteModel
+from .models import SiteModel, Site
+LOG_MODULE = "site_model"
 
 
 def _serialize(obj):
@@ -46,6 +49,9 @@ def _duplicate_description(site_model_description, exclude_pk=None):
 def create_site_model(site_model, site_model_description, user):
 
     if _duplicate(site_model):
+        write_log(LOG_MODULE, "Failed", user,
+                  f"Create failed: site model '{site_model}' already exists",
+                  status="FAILED")
         return {
             "success": False,
             "message": "Site model already exists",
@@ -53,6 +59,9 @@ def create_site_model(site_model, site_model_description, user):
         }
 
     if _duplicate_description(site_model_description):
+        write_log(LOG_MODULE, "Failed", user,
+                  f"Create failed for '{site_model}': description already used by another site model",
+                  status="FAILED")
         return {
             "success": False,
             "message": "This description is already used by another site model",
@@ -67,12 +76,17 @@ def create_site_model(site_model, site_model_description, user):
             updated_by=user,
         )
     except IntegrityError:
+        write_log(LOG_MODULE, "Failed", user,
+                  f"Create failed: site model '{site_model}' already exists",
+                  status="FAILED")
         return {
             "success": False,
             "message": "Site model already exists",
             "status_code": 409,
         }
-
+    write_log(LOG_MODULE, "Created", user,
+              f"Created site model '{obj.site_model}'",
+              ref=str(obj.guid))
     return {
         "success": True,
         "message": "Site model created",
@@ -85,6 +99,9 @@ def update_site_model(guid, site_model, site_model_description, user):
     obj = SiteModel.objects.filter(guid=guid).first()
 
     if obj is None:
+        write_log(LOG_MODULE, "Failed", user,
+                  f"Update failed: site model {guid} not found",
+                  status="FAILED", ref=str(guid))
         return {
             "success": False,
             "message": "Site model not found",
@@ -92,6 +109,9 @@ def update_site_model(guid, site_model, site_model_description, user):
         }
 
     if _duplicate(site_model, exclude_pk=obj.pk):
+        write_log(LOG_MODULE, "Failed", user,
+                  f"Update failed: site model '{site_model}' already exists",
+                  status="FAILED", ref=str(guid))
         return {
             "success": False,
             "message": "Site model already exists",
@@ -99,16 +119,31 @@ def update_site_model(guid, site_model, site_model_description, user):
         }
 
     if _duplicate_description(site_model_description, exclude_pk=obj.pk):
+        write_log(LOG_MODULE, "Failed", user,
+                  f"Update failed for '{obj.site_model}': description already used by another site model",
+                  status="FAILED", ref=str(guid))
         return {
             "success": False,
             "message": "This description is already used by another site model",
             "status_code": 409,
         }
+    old_name = obj.site_model
+    old_desc = obj.site_model_description
 
     obj.site_model = site_model
     obj.site_model_description = site_model_description
     obj.updated_by = user
     obj.save()
+
+    changes = []
+    if old_name != site_model:
+        changes.append(f"name '{old_name}' -> '{site_model}'")
+    if old_desc != site_model_description:
+        changes.append(f"description '{old_desc}' -> '{site_model_description}'")
+
+    write_log(LOG_MODULE, "Updated", user,
+              f"Updated site model '{old_name}': " + (", ".join(changes) or "no field changes"),
+              ref=str(obj.guid))
 
     return {
         "success": True,
@@ -117,21 +152,83 @@ def update_site_model(guid, site_model, site_model_description, user):
     }
 
 
-def delete_site_model(guid):
+# def delete_site_model(guid):
 
-    deleted, _ = SiteModel.objects.filter(guid=guid).delete()
+#     deleted, _ = SiteModel.objects.filter(guid=guid).delete()
 
-    if not deleted:
+#     if not deleted:
+#         return {
+#             "success": False,
+#             "message": "Site model not found",
+#             "status_code": 404,
+#         }
+
+#     return {
+#         "success": True,
+#         "message": "Site model deleted",
+#     }
+
+
+
+def delete_site_model(guid, user=None):
+    site_model = SiteModel.objects.filter(guid=guid).first()
+
+    if site_model is None:
+        write_log(LOG_MODULE, "Failed", user,
+                  f"Delete failed: site model {guid} not found",
+                  status="FAILED", ref=str(guid))
         return {
             "success": False,
             "message": "Site model not found",
             "status_code": 404,
         }
+    name = site_model.site_model
+    # Find sites using this site model.
+    related_sites = Site.objects.filter(site_model=site_model)
+
+    if related_sites.exists():
+        site_names = list(
+            related_sites.values_list("site_name", flat=True)
+        )
+
+        write_log(LOG_MODULE, "Failed", user,
+                  f"Delete failed for '{name}': used by sites {', '.join(site_names)}",
+                  status="FAILED", ref=str(guid))
+
+        return {
+            "success": False,
+            "message": (
+                f"Cannot delete site model '{site_model.site_model}' "
+                f"because it is used by these sites: "
+                f"{', '.join(site_names)}. "
+                "Please reassign or delete those sites first."
+            ),
+            "status_code": 409,
+        }
+
+    try:
+        site_model.delete()
+    except ProtectedError:
+        write_log(LOG_MODULE, "Failed", user,
+                  f"Delete failed for '{name}': other records still use it",
+                  status="FAILED", ref=str(guid))
+        return {
+            "success": False,
+            "message": (
+                "Cannot delete this site model because "
+                "other records are still using it."
+            ),
+            "status_code": 409,
+        }
+    write_log(LOG_MODULE, "Deleted", user,
+              f"Deleted site model '{name}'",
+              ref=str(guid))
 
     return {
         "success": True,
-        "message": "Site model deleted",
+        "message": "Site model deleted successfully",
     }
+
 
 
 def list_site_models(page=None, page_size=None):

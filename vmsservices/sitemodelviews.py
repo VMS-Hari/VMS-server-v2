@@ -61,7 +61,7 @@ def site_model_delete_api(request):
     s = SiteModelDeleteSerializer(data=request.data)
     if not s.is_valid():
         return _invalid(s)
-    result = delete_site_model(guid=s.validated_data["guid"])
+    result = delete_site_model(guid=s.validated_data["guid"], user=request.user)
     return _respond(result)
 
 

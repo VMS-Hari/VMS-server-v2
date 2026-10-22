@@ -978,13 +978,13 @@ class VisitRecordBase(models.Model):
 
     # ===================== NEW CODE START =====================
     # which visitor type was chosen on the pre-registration form
-    # visitor_type = models.ForeignKey(
-    #     "VisitorType",
-    #     on_delete=models.PROTECT,
-    #     null=True,
-    #     blank=True,
-    #     related_name="%(class)s_records",
-    # )
+    visitor_type = models.ForeignKey(
+        "VisitorType",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="%(class)s_records",
+    )
 
     # who approved / rejected, when, and why (feeds the History tab)
     # approved_by = models.ForeignKey(
